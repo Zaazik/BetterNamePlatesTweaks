@@ -137,6 +137,30 @@ local function applyFullName(view, unit)
     applyNameWidth(view)
 end
 
+-- Same format as Logic.FormatHealth, for secret health values: only
+-- AbbreviateNumbers may read them; it takes our own breakpoints
+-- (largest first; abbreviationIsGlobal = false uses the literal suffix).
+local HEALTH_ABBREVIATIONS = {breakpointData = {
+    {breakpoint = 10000000, abbreviation = "м", significandDivisor = 1000000,
+        fractionDivisor = 1, abbreviationIsGlobal = false},
+    {breakpoint = 1000000, abbreviation = "м", significandDivisor = 100000,
+        fractionDivisor = 10, abbreviationIsGlobal = false},
+    {breakpoint = 10000, abbreviation = "к", significandDivisor = 100,
+        fractionDivisor = 10, abbreviationIsGlobal = false},
+    {breakpoint = 1000, abbreviation = "к", significandDivisor = 100,
+        fractionDivisor = 10, abbreviationIsGlobal = false},
+}}
+
+local function formatSecretHealth(health)
+    local ok, text = pcall(AbbreviateNumbers, health, HEALTH_ABBREVIATIONS)
+    if ok then
+        return text
+    end
+    report("abbrev", "custom к/м abbreviations rejected by the client (" ..
+        tostring(text) .. "); using the default format")
+    return AbbreviateNumbers(health)
+end
+
 -- Right-hand text shows current health (900, 1.5к) instead of percent.
 local writingHealth = false
 local function applyHealthText(view)
@@ -147,7 +171,7 @@ local function applyHealthText(view)
     local health = UnitHealth(unit)
     local text
     if issecretvalue and issecretvalue(health) then
-        text = AbbreviateNumbers(health) -- secret values: Blizzard formatter only
+        text = formatSecretHealth(health)
     else
         text = Logic.FormatHealth(health)
     end
@@ -185,9 +209,9 @@ local function createGlow(indicator, bar)
     edge("VERTICAL", clear, solid,
         {"TOPLEFT", "BOTTOMLEFT", 0, 0}, {"BOTTOMRIGHT", "BOTTOMRIGHT", 0, -g})
     edge("HORIZONTAL", clear, solid,
-        {"TOPRIGHT", "TOPLEFT", 0, 0}, {"BOTTOMLEFT", "BOTTOMLEFT", -g, 0})
+        {"TOPRIGHT", "TOPLEFT", 0, g}, {"BOTTOMLEFT", "BOTTOMLEFT", -g, -g})
     edge("HORIZONTAL", solid, clear,
-        {"TOPLEFT", "TOPRIGHT", 0, 0}, {"BOTTOMRIGHT", "BOTTOMRIGHT", g, 0})
+        {"TOPLEFT", "TOPRIGHT", 0, g}, {"BOTTOMRIGHT", "BOTTOMRIGHT", g, -g})
 end
 
 -- One-time restyle of a BetterNamePlates view.
