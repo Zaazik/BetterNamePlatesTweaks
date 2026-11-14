@@ -135,6 +135,23 @@ local function layout(view, basePlate)
     desiredWidth, desiredHeight = width, height
 end
 
+-- Full name on one line; the font string itself truncates at the bar width.
+local function applyFullName(view, unit)
+    local name = UnitName(unit)
+    if not name then
+        return
+    end
+    local level = UnitEffectiveLevel and UnitEffectiveLevel(unit) or
+        UnitLevel(unit)
+    local text = Logic.FormatName(name, level, UnitClassification(unit))
+    for _, layer in ipairs(view.nameLayers) do
+        layer:SetWordWrap(false)
+        layer:SetNonSpaceWrap(false)
+        layer:SetMaxLines(1)
+        layer:SetText(text)
+    end
+end
+
 local function handlePlate(unit)
     local basePlate = C_NamePlate.GetNamePlateForUnit(unit)
     local view = basePlate and basePlate.BetterNamePlatesView
@@ -143,6 +160,7 @@ local function handlePlate(unit)
         return
     end
     hookView(view)
+    applyFullName(view, unit)
     layout(view, basePlate)
     applySize()
     paint(view)

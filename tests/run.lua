@@ -31,6 +31,10 @@ check("click width", w, 189)
 check("click height (view + name + gap)", h, (20.7 + 8) * 2)
 check("offset centers stack", y, -4)
 
+check("cyrillic name not cut", Logic.FormatName("Старый кабан", 8, "normal"), "8 Старый кабан")
+check("elite suffix", Logic.FormatName("Огр", 30, "elite"), "30 Огр (E)")
+check("skull level", Logic.FormatName("Босс", -1, "worldboss"), "?? Босс")
+
 if failures > 0 then
     print(failures .. " failure(s)")
     os.exit(1)

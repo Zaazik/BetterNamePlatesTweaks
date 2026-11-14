@@ -62,6 +62,24 @@ function Logic.ClickBox(viewWidth, viewHeight, nameHeight, viewToPlateRatio)
         -nameExtra / 2
 end
 
+-- Same format as BetterNamePlates on Classic clients ("8 Name (E)"), but
+-- without its byte-based 16-char cut that chops UTF-8 (Cyrillic) names.
+local CLASSIFICATION_SUFFIXES = {
+    elite = " (E)",
+    rare = " (R)",
+    rareelite = " (RE)",
+}
+
+function Logic.FormatName(name, level, classification)
+    local prefix = ""
+    if level == -1 then
+        prefix = "?? "
+    elseif type(level) == "number" and level > 0 then
+        prefix = tostring(level) .. " "
+    end
+    return prefix .. name .. (CLASSIFICATION_SUFFIXES[classification] or "")
+end
+
 ns.Logic = Logic
 
 return Logic
