@@ -5,16 +5,12 @@ local _, ns = ...
 local Logic = ns.Logic
 
 local CVARS = {
-    {"nameplateMotion", "1"},   -- stack plates instead of piling them up
-    {"nameplateMinScale", "1"}, -- keep the click box the same size at any
-    {"nameplateMaxScale", "1"}, -- distance (our bars ignore this scale anyway)
+    {"nameplateMotion", "1"}, -- stack plates instead of piling them up
 }
 
 local hookedViews = setmetatable({}, {__mode = "k"})
 local painting = false
 local cvarsPending = false
-local desiredWidth, desiredHeight
-local appliedWidth, appliedHeight
 local reported = {}
 
 local function report(key, message)
@@ -41,25 +37,20 @@ local function applyCVars()
     end
 end
 
--- Base plate size = click area and stacking box.
-local function applySize()
-    if not desiredWidth then
-        return
+-- Click area: make the Blizzard plate's hit rect cover our health/cast view.
+-- In combat the client only allows this on the tick the unit is assigned,
+-- so it must run synchronously inside NAME_PLATE_UNIT_ADDED.
+local function applyHitTest(basePlate, view)
+    if not basePlate.SetAllHitTestPoints then
+        report("hit", "NamePlate:SetAllHitTestPoints is missing in this " ..
+            "client; click area left unchanged (type /bnpt)")
+        return true
     end
-    if not (C_NamePlate and C_NamePlate.SetNamePlateEnemySize) then
-        report("size", "C_NamePlate.SetNamePlateEnemySize is missing in this " ..
-            "client; click area left unchanged")
-        return
+    if not basePlate:CanChangeHitTestPoints() then
+        return false
     end
-    if appliedWidth and math.abs(appliedWidth - desiredWidth) < 0.5 and
-        math.abs(appliedHeight - desiredHeight) < 0.5 then
-        return
-    end
-    if InCombatLockdown() then
-        return -- retried on PLAYER_REGEN_ENABLED
-    end
-    C_NamePlate.SetNamePlateEnemySize(desiredWidth, desiredHeight)
-    appliedWidth, appliedHeight = desiredWidth, desiredHeight
+    basePlate:SetAllHitTestPoints(view)
+    return true
 end
 
 local function isGroupTank()
@@ -125,16 +116,6 @@ local function hookView(view)
     end)
 end
 
-local function layout(view, basePlate)
-    local plateUnitScale = basePlate:GetEffectiveScale() / basePlate:GetScale()
-    local ratio = view:GetEffectiveScale() / plateUnitScale
-    local width, height, offsetY = Logic.ClickBox(
-        view:GetWidth(), view:GetHeight(), view.name:GetHeight(), ratio)
-    view:ClearAllPoints()
-    view:SetPoint("CENTER", basePlate, "CENTER", 0, offsetY)
-    desiredWidth, desiredHeight = width, height
-end
-
 -- Full name on one line; the font string itself truncates at the bar width.
 local function applyFullName(view, unit)
     local name = UnitName(unit)
@@ -152,18 +133,23 @@ local function applyFullName(view, unit)
     end
 end
 
+local hitTestPending = {}
+
+-- Returns false when BetterNamePlates has not built the view yet.
 local function handlePlate(unit)
     local basePlate = C_NamePlate.GetNamePlateForUnit(unit)
     local view = basePlate and basePlate.BetterNamePlatesView
     -- Friendly plates and BetterNamePlates' Blizzard mode have no active view.
     if not view or view.unit ~= unit or not view:IsShown() then
-        return
+        return false
     end
     hookView(view)
     applyFullName(view, unit)
-    layout(view, basePlate)
-    applySize()
+    if not applyHitTest(basePlate, view) then
+        hitTestPending[basePlate] = view -- retried after combat
+    end
     paint(view)
+    return true
 end
 
 local function handleAllPlates()
@@ -181,8 +167,11 @@ frame:RegisterEvent("PLAYER_REGEN_ENABLED")
 frame:RegisterEvent("NAME_PLATE_UNIT_ADDED")
 frame:SetScript("OnEvent", function(_, event, unit)
     if event == "NAME_PLATE_UNIT_ADDED" then
-        -- Run after BetterNamePlates has built the view for this plate.
-        C_Timer.After(0, function() handlePlate(unit) end)
+        -- BetterNamePlates (loaded first) normally built the view already;
+        -- if not, retry next frame.
+        if not handlePlate(unit) then
+            C_Timer.After(0, function() handlePlate(unit) end)
+        end
     elseif event == "PLAYER_ENTERING_WORLD" then
         applyCVars()
         C_Timer.After(0, handleAllPlates)
@@ -190,14 +179,42 @@ frame:SetScript("OnEvent", function(_, event, unit)
         if cvarsPending then
             applyCVars()
         end
-        applySize()
+        for basePlate, view in pairs(hitTestPending) do
+            hitTestPending[basePlate] = nil
+            if view:IsShown() then
+                applyHitTest(basePlate, view)
+            end
+        end
     end
 end)
 
--- Blizzard resets the base plate size when nameplate options change.
-if NamePlateDriverFrame and NamePlateDriverFrame.UpdateNamePlateOptions then
-    hooksecurefunc(NamePlateDriverFrame, "UpdateNamePlateOptions", function()
-        appliedWidth, appliedHeight = nil, nil
-        applySize()
-    end)
+-- /bnpt: show which nameplate APIs this client really has.
+SLASH_BETTERNAMEPLATESTWEAKS1 = "/bnpt"
+SlashCmdList.BETTERNAMEPLATESTWEAKS = function()
+    local function has(value) return value and "yes" or "NO" end
+    local version, build, _, interface = GetBuildInfo()
+    print("BNPT client:", version, build, interface)
+    print("BNPT C_NamePlate.SetNamePlateEnemySize:",
+        has(C_NamePlate.SetNamePlateEnemySize))
+    print("BNPT C_NamePlate.SetNamePlateSize:",
+        has(C_NamePlate.SetNamePlateSize))
+    if C_NamePlate.GetNamePlateSize then
+        print("BNPT C_NamePlate.GetNamePlateSize:", C_NamePlate.GetNamePlateSize())
+    end
+    local plate = C_NamePlate.GetNamePlates()[1]
+    if not plate then
+        print("BNPT no nameplate on screen: stand near a mob and repeat /bnpt")
+    else
+        print("BNPT plate size:", plate:GetSize())
+        for _, method in ipairs({"SetAllHitTestPoints", "SetHitTestPoints",
+            "CanChangeHitTestPoints", "GetHitTestPoints",
+            "SetStackingBoundsFrame", "SetHitRectInsets"}) do
+            print("BNPT plate:" .. method .. ":", has(plate[method]))
+        end
+        if plate.GetHitTestPoints then
+            print("BNPT hit-test points:", #plate:GetHitTestPoints())
+        end
+        print("BNPT BetterNamePlates view:", has(plate.BetterNamePlatesView))
+    end
+    print("BNPT nameplateMotion =", GetCVar("nameplateMotion"))
 end

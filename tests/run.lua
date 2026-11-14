@@ -26,11 +26,6 @@ check("status 3 -> aggro", Logic.DecideColor({canAttack = true, threatStatus = 3
 check("tapped -> keep gray", Logic.DecideColor({canAttack = true, isTapDenied = true, threatStatus = 3}), nil)
 check("group tank -> keep", Logic.DecideColor({canAttack = true, isTank = true, threatStatus = 3}), nil)
 
-local w, h, y = Logic.ClickBox(94.5, 20.7, 7, 2)
-check("click width", w, 189)
-check("click height (view + name + gap)", h, (20.7 + 8) * 2)
-check("offset centers stack", y, -4)
-
 check("cyrillic name not cut", Logic.FormatName("Старый кабан", 8, "normal"), "8 Старый кабан")
 check("elite suffix", Logic.FormatName("Огр", 30, "elite"), "30 Огр (E)")
 check("skull level", Logic.FormatName("Босс", -1, "worldboss"), "?? Босс")

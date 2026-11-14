@@ -13,9 +13,6 @@ Logic.COLORS = {
 -- UnitDetailedThreatSituation scaledPercent: 100 = you pull aggro.
 Logic.PULL_WARNING_PERCENT = 80
 
--- Gap between the name and the health bar inside BetterNamePlates (nameGap).
-Logic.NAME_GAP = 1
-
 -- Returns {r, g, b} to paint, or nil to keep BetterNamePlates' own color.
 -- unit fields: canAttack, isPlayer, classColor, isTapDenied, isTank,
 -- threatStatus (UnitThreatSituation), threatPercent (scaledPercent).
@@ -47,19 +44,6 @@ function Logic.DecideColor(unit)
     end
 
     return nil
-end
-
--- Click box for a BetterNamePlates view.
--- view* are in the view's own units; the name sits above the view's top edge.
--- Returns the base-plate size (in base-plate units) and the Y offset that
--- centers the whole name + health + cast stack on the base plate.
-function Logic.ClickBox(viewWidth, viewHeight, nameHeight, viewToPlateRatio)
-    local nameExtra = nameHeight + Logic.NAME_GAP
-    local stackHeight = viewHeight + nameExtra
-
-    return viewWidth * viewToPlateRatio,
-        stackHeight * viewToPlateRatio,
-        -nameExtra / 2
 end
 
 -- Same format as BetterNamePlates on Classic clients ("8 Name (E)"), but
