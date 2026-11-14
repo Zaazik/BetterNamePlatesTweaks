@@ -98,7 +98,8 @@ end
 -- Room kept free on the right of the bar for the health number.
 local HEALTH_TEXT_ROOM = 30
 local GOLD = {0.91, 0.72, 0.17}
-local GLOW_SIZE = 4
+local GLOW_SIZE = 1.5   -- view units (~3 px on 1440p)
+local GLOW_ALPHA = 0.6
 
 -- Name stops short of the health number. BetterNamePlates resets the width
 -- on resize, so this also runs from a SetWidth hook (see styleView).
@@ -175,14 +176,14 @@ local function createGlow(indicator, bar)
             texture:SetPoint(point[1], bar, point[2], point[3], point[4])
         end
     end
-    local solid = CreateColor(GOLD[1], GOLD[2], GOLD[3], 0.9)
+    local solid = CreateColor(GOLD[1], GOLD[2], GOLD[3], GLOW_ALPHA)
     local clear = CreateColor(GOLD[1], GOLD[2], GOLD[3], 0)
     local g = GLOW_SIZE
     -- VERTICAL gradient: first color = bottom; HORIZONTAL: first = left.
     edge("VERTICAL", solid, clear,
-        {"BOTTOMLEFT", "TOPLEFT", -g, 0}, {"TOPRIGHT", "TOPRIGHT", g, g})
+        {"BOTTOMLEFT", "TOPLEFT", 0, 0}, {"TOPRIGHT", "TOPRIGHT", 0, g})
     edge("VERTICAL", clear, solid,
-        {"TOPLEFT", "BOTTOMLEFT", -g, 0}, {"BOTTOMRIGHT", "BOTTOMRIGHT", g, -g})
+        {"TOPLEFT", "BOTTOMLEFT", 0, 0}, {"BOTTOMRIGHT", "BOTTOMRIGHT", 0, -g})
     edge("HORIZONTAL", clear, solid,
         {"TOPRIGHT", "TOPLEFT", 0, 0}, {"BOTTOMLEFT", "BOTTOMLEFT", -g, 0})
     edge("HORIZONTAL", solid, clear,
@@ -206,7 +207,10 @@ local function styleView(view)
     end
 
     -- Health number moves to the right-hand (percent) slot.
-    view.healthText:SetAlpha(0)
+    -- Hide the left health number; BetterNamePlates never shows it again
+    -- itself, the hook covers any other caller.
+    view.healthText:Hide()
+    hooksecurefunc(view.healthText, "Show", function(text) text:Hide() end)
     hooksecurefunc(view.healthPercentage, "SetText", function()
         if not writingHealth then
             applyHealthText(view)
