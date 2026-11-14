@@ -4,13 +4,8 @@
 local _, ns = ...
 local Logic = ns.Logic
 
-local CVARS = {
-    {"nameplateMotion", "1"}, -- stack plates instead of piling them up
-}
-
 local hookedViews = setmetatable({}, {__mode = "k"})
 local painting = false
-local cvarsPending = false
 local reported = {}
 
 local function report(key, message)
@@ -19,22 +14,6 @@ local function report(key, message)
     end
     reported[key] = true
     print("|cffff4040BetterNamePlatesTweaks:|r " .. message)
-end
-
-local function applyCVars()
-    if InCombatLockdown() then
-        cvarsPending = true
-        return
-    end
-    cvarsPending = false
-    for _, setting in ipairs(CVARS) do
-        local name, value = setting[1], setting[2]
-        SetCVar(name, value)
-        if tonumber(GetCVar(name)) ~= tonumber(value) then
-            report("cvar:" .. name, "could not set CVar " .. name .. " = " ..
-                value .. " (current: " .. tostring(GetCVar(name)) .. ")")
-        end
-    end
 end
 
 -- Click area: make the Blizzard plate's hit rect cover our health/cast view.
@@ -173,12 +152,8 @@ frame:SetScript("OnEvent", function(_, event, unit)
             C_Timer.After(0, function() handlePlate(unit) end)
         end
     elseif event == "PLAYER_ENTERING_WORLD" then
-        applyCVars()
         C_Timer.After(0, handleAllPlates)
     elseif event == "PLAYER_REGEN_ENABLED" then
-        if cvarsPending then
-            applyCVars()
-        end
         for basePlate, view in pairs(hitTestPending) do
             hitTestPending[basePlate] = nil
             if view:IsShown() then
@@ -201,20 +176,25 @@ SlashCmdList.BETTERNAMEPLATESTWEAKS = function()
     if C_NamePlate.GetNamePlateSize then
         print("BNPT C_NamePlate.GetNamePlateSize:", C_NamePlate.GetNamePlateSize())
     end
-    local plate = C_NamePlate.GetNamePlates()[1]
-    if not plate then
-        print("BNPT no nameplate on screen: stand near a mob and repeat /bnpt")
-    else
-        print("BNPT plate size:", plate:GetSize())
-        for _, method in ipairs({"SetAllHitTestPoints", "SetHitTestPoints",
-            "CanChangeHitTestPoints", "GetHitTestPoints",
-            "SetStackingBoundsFrame", "SetHitRectInsets"}) do
-            print("BNPT plate:" .. method .. ":", has(plate[method]))
-        end
-        if plate.GetHitTestPoints then
-            print("BNPT hit-test points:", #plate:GetHitTestPoints())
-        end
-        print("BNPT BetterNamePlates view:", has(plate.BetterNamePlatesView))
+    local plates = C_NamePlate.GetNamePlates()
+    local first = plates[1]
+    if first then
+        print("BNPT plate API: SetAllHitTestPoints", has(first.SetAllHitTestPoints),
+            "CanChangeHitTestPoints", has(first.CanChangeHitTestPoints),
+            "SetStackingBoundsFrame", has(first.SetStackingBoundsFrame))
     end
-    print("BNPT nameplateMotion =", GetCVar("nameplateMotion"))
+    local enemies = 0
+    for _, plate in ipairs(plates) do
+        local view = plate.BetterNamePlatesView
+        if view and view:IsShown() and view.unit then
+            enemies = enemies + 1
+            local points = plate.GetHitTestPoints and #plate:GetHitTestPoints() or "?"
+            print("BNPT", view.unit, UnitName(view.unit) or "?",
+                "hit-test points:", points,
+                points ~= "?" and points > 0 and "(click area = bar)" or "(NOT SET)")
+        end
+    end
+    if enemies == 0 then
+        print("BNPT no enemy plates on screen: stand near hostile mobs and repeat /bnpt")
+    end
 end
