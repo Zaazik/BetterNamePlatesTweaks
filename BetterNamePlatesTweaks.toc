@@ -1,0 +1,8 @@
+## Interface: 16001
+## Title: BetterNamePlates Tweaks
+## Notes: Click-to-target box, stacking, enemy class colors and solo threat colors on top of BetterNamePlates.
+## Version: 0.1.0
+## Dependencies: BetterNamePlates
+
+Logic.lua
+Tweaks.lua
