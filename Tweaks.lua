@@ -188,10 +188,12 @@ SlashCmdList.BETTERNAMEPLATESTWEAKS = function()
         local view = plate.BetterNamePlatesView
         if view and view:IsShown() and view.unit then
             enemies = enemies + 1
-            local points = plate.GetHitTestPoints and #plate:GetHitTestPoints() or "?"
-            print("BNPT", view.unit, UnitName(view.unit) or "?",
-                "hit-test points:", points,
-                points ~= "?" and points > 0 and "(click area = bar)" or "(NOT SET)")
+            -- Print the error text instead of aborting the whole report.
+            local ok, points = pcall(function()
+                return #plate:GetHitTestPoints()
+            end)
+            print("BNPT", view.unit, "hit-test points:",
+                ok and points or ("ERROR " .. tostring(points)))
         end
     end
     if enemies == 0 then
