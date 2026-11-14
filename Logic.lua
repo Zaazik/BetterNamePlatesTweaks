@@ -46,22 +46,30 @@ function Logic.DecideColor(unit)
     return nil
 end
 
--- Same format as BetterNamePlates on Classic clients ("8 Name (E)"), but
--- without its byte-based 16-char cut that chops UTF-8 (Cyrillic) names.
-local CLASSIFICATION_SUFFIXES = {
-    elite = " (E)",
-    rare = " (R)",
-    rareelite = " (RE)",
-}
-
-function Logic.FormatName(name, level, classification)
-    local prefix = ""
+-- "%lvl %name": BetterNamePlates cuts names by bytes, which chops UTF-8
+-- (Cyrillic) names, so the full name is rebuilt here.
+function Logic.FormatName(name, level)
     if level == -1 then
-        prefix = "?? "
+        return "?? " .. name
     elseif type(level) == "number" and level > 0 then
-        prefix = tostring(level) .. " "
+        return tostring(level) .. " " .. name
     end
-    return prefix .. name .. (CLASSIFICATION_SUFFIXES[classification] or "")
+    return name
+end
+
+-- Current health: 900, 1.5к, 12к, 1.2м.
+local function shortNumber(value, divisor, suffix)
+    local text = string.format("%.1f", value / divisor):gsub("%.0$", "")
+    return text .. suffix
+end
+
+function Logic.FormatHealth(health)
+    if health < 1000 then
+        return tostring(math.floor(health))
+    elseif health < 999950 then -- 999950+ would round to "1000.0к"
+        return shortNumber(health, 1000, "к")
+    end
+    return shortNumber(health, 1000000, "м")
 end
 
 ns.Logic = Logic

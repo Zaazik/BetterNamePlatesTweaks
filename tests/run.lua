@@ -26,9 +26,16 @@ check("status 3 -> aggro", Logic.DecideColor({canAttack = true, threatStatus = 3
 check("tapped -> keep gray", Logic.DecideColor({canAttack = true, isTapDenied = true, threatStatus = 3}), nil)
 check("group tank -> keep", Logic.DecideColor({canAttack = true, isTank = true, threatStatus = 3}), nil)
 
-check("cyrillic name not cut", Logic.FormatName("Старый кабан", 8, "normal"), "8 Старый кабан")
-check("elite suffix", Logic.FormatName("Огр", 30, "elite"), "30 Огр (E)")
-check("skull level", Logic.FormatName("Босс", -1, "worldboss"), "?? Босс")
+check("lvl name", Logic.FormatName("Старый кабан", 8), "8 Старый кабан")
+check("elite has no suffix", Logic.FormatName("Огр", 30), "30 Огр")
+check("skull level", Logic.FormatName("Босс", -1), "?? Босс")
+check("hp 900", Logic.FormatHealth(900), "900")
+check("hp 1500", Logic.FormatHealth(1500), "1.5к")
+check("hp 2000", Logic.FormatHealth(2000), "2к")
+check("hp 12345", Logic.FormatHealth(12345), "12.3к")
+check("hp 999960", Logic.FormatHealth(999960), "1м")
+check("hp 999949", Logic.FormatHealth(999949), "999.9к")
+check("hp 1234567", Logic.FormatHealth(1234567), "1.2м")
 
 if failures > 0 then
     print(failures .. " failure(s)")

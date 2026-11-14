@@ -95,7 +95,30 @@ local function hookView(view)
     end)
 end
 
--- Full name on one line; the font string itself truncates at the bar width.
+-- Room kept free on the right of the bar for the health number.
+local HEALTH_TEXT_ROOM = 30
+local GOLD = {0.91, 0.72, 0.17}
+local GLOW_SIZE = 4
+
+-- Name stops short of the health number. BetterNamePlates resets the width
+-- on resize, so this also runs from a SetWidth hook (see styleView).
+local settingNameWidth = false
+local function applyNameWidth(view)
+    local width = view.healthForeground:GetWidth() - HEALTH_TEXT_ROOM
+    settingNameWidth = true
+    local ok, err = pcall(function()
+        for _, layer in ipairs(view.nameLayers) do
+            layer:SetWidth(width)
+        end
+    end)
+    settingNameWidth = false
+    if not ok then
+        error(err)
+    end
+end
+
+-- "%lvl %name" on one line; the font string truncates at its width, which
+-- stops short of the health number on the right of the bar.
 local function applyFullName(view, unit)
     local name = UnitName(unit)
     if not name then
@@ -103,13 +126,106 @@ local function applyFullName(view, unit)
     end
     local level = UnitEffectiveLevel and UnitEffectiveLevel(unit) or
         UnitLevel(unit)
-    local text = Logic.FormatName(name, level, UnitClassification(unit))
+    local text = Logic.FormatName(name, level)
     for _, layer in ipairs(view.nameLayers) do
         layer:SetWordWrap(false)
         layer:SetNonSpaceWrap(false)
         layer:SetMaxLines(1)
         layer:SetText(text)
     end
+    applyNameWidth(view)
+end
+
+-- Right-hand text shows current health (900, 1.5к) instead of percent.
+local writingHealth = false
+local function applyHealthText(view)
+    local unit = view.unit
+    if not view:IsShown() or not unit or not UnitExists(unit) then
+        return
+    end
+    local health = UnitHealth(unit)
+    local text
+    if issecretvalue and issecretvalue(health) then
+        text = AbbreviateNumbers(health) -- secret values: Blizzard formatter only
+    else
+        text = Logic.FormatHealth(health)
+    end
+    writingHealth = true
+    local ok, err = pcall(view.healthPercentage.SetText,
+        view.healthPercentage, text)
+    writingHealth = false
+    if not ok then
+        error(err)
+    end
+end
+
+local function createGlow(indicator, bar)
+    local glow = CreateFrame("Frame", nil, indicator)
+    glow:SetAllPoints(bar)
+    if not glow:CreateTexture().SetGradient then
+        glow:Hide()
+        report("glow", "Texture:SetGradient is missing; target glow disabled")
+        return
+    end
+    local function edge(orientation, inner, outer, ...)
+        local texture = glow:CreateTexture(nil, "BACKGROUND")
+        texture:SetColorTexture(1, 1, 1, 1)
+        texture:SetGradient(orientation, inner, outer)
+        for _, point in ipairs({...}) do
+            texture:SetPoint(point[1], bar, point[2], point[3], point[4])
+        end
+    end
+    local solid = CreateColor(GOLD[1], GOLD[2], GOLD[3], 0.9)
+    local clear = CreateColor(GOLD[1], GOLD[2], GOLD[3], 0)
+    local g = GLOW_SIZE
+    -- VERTICAL gradient: first color = bottom; HORIZONTAL: first = left.
+    edge("VERTICAL", solid, clear,
+        {"BOTTOMLEFT", "TOPLEFT", -g, 0}, {"TOPRIGHT", "TOPRIGHT", g, g})
+    edge("VERTICAL", clear, solid,
+        {"TOPLEFT", "BOTTOMLEFT", -g, 0}, {"BOTTOMRIGHT", "BOTTOMRIGHT", g, -g})
+    edge("HORIZONTAL", clear, solid,
+        {"TOPRIGHT", "TOPLEFT", 0, 0}, {"BOTTOMLEFT", "BOTTOMLEFT", -g, 0})
+    edge("HORIZONTAL", solid, clear,
+        {"TOPLEFT", "TOPRIGHT", 0, 0}, {"BOTTOMRIGHT", "BOTTOMRIGHT", g, 0})
+end
+
+-- One-time restyle of a BetterNamePlates view.
+local styledViews = setmetatable({}, {__mode = "k"})
+local function styleView(view)
+    if styledViews[view] then
+        return
+    end
+    styledViews[view] = true
+
+    for _, layer in ipairs(view.nameLayers) do
+        hooksecurefunc(layer, "SetWidth", function()
+            if not settingNameWidth then
+                applyNameWidth(view)
+            end
+        end)
+    end
+
+    -- Health number moves to the right-hand (percent) slot.
+    view.healthText:SetAlpha(0)
+    hooksecurefunc(view.healthPercentage, "SetText", function()
+        if not writingHealth then
+            applyHealthText(view)
+        end
+    end)
+
+    -- Target: gold border + soft gold glow (indicator is shown only on target).
+    local indicator = view.targetIndicator
+    local arrows = {[indicator.leftArrow] = true, [indicator.rightArrow] = true}
+    local borderRegions = {indicator:GetRegions()}
+    for _, region in ipairs({indicator.corners:GetRegions()}) do
+        borderRegions[#borderRegions + 1] = region
+    end
+    for _, region in ipairs(borderRegions) do
+        if not arrows[region] and region.SetColorTexture then
+            region:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 1)
+        end
+    end
+    createGlow(indicator, view.healthForeground)
 end
 
 local hitTestPending = {}
@@ -123,7 +239,9 @@ local function handlePlate(unit)
         return false
     end
     hookView(view)
+    styleView(view)
     applyFullName(view, unit)
+    applyHealthText(view)
     if not applyHitTest(basePlate, view) then
         hitTestPending[basePlate] = view -- retried after combat
     end
