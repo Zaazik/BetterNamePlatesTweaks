@@ -45,12 +45,21 @@ local function getClassColor(unit)
     return color and {color.r, color.g, color.b} or nil
 end
 
-local function getThreatPercent(unit)
-    if not UnitDetailedThreatSituation then
-        return nil
-    end
+-- Threat for this mob with hidden (secret) values flagged, see
+-- Logic.VisibleThreat. Hidden values are said once per session in chat.
+local function readThreat(unit)
     local _, _, scaledPercent = UnitDetailedThreatSituation("player", unit)
-    return scaledPercent
+    local threat = Logic.VisibleThreat(UnitThreatSituation("player", unit),
+        scaledPercent, issecretvalue)
+    if threat.threatStatusHidden then
+        report("threatStatus", "здесь игра скрывает статус угрозы — " ..
+            "цвета угрозы не работают, полоски в цветах BetterNamePlates")
+    elseif threat.threatPercentHidden then
+        report("threatPercent", "здесь игра скрывает процент угрозы — " ..
+            "светло-красный только когда угрозы больше, чем у танка " ..
+            "(сигнала с " .. Logic.PULL_WARNING_PERCENT .. "% тут нет)")
+    end
+    return threat
 end
 
 local function paint(view)
@@ -59,14 +68,16 @@ local function paint(view)
         return
     end
     local isPlayer = UnitIsPlayer(unit)
+    local threat = readThreat(unit)
     local color = Logic.DecideColor({
         canAttack = UnitCanAttack("player", unit),
         isPlayer = isPlayer,
         classColor = isPlayer and getClassColor(unit) or nil,
         isTapDenied = UnitIsTapDenied and UnitIsTapDenied(unit),
         isTank = isGroupTank(),
-        threatStatus = UnitThreatSituation("player", unit),
-        threatPercent = getThreatPercent(unit),
+        threatStatus = threat.threatStatus,
+        threatPercent = threat.threatPercent,
+        threatStatusHidden = threat.threatStatusHidden,
     })
     if not color then
         return -- keep BetterNamePlates' own color

@@ -13,9 +13,26 @@ Logic.COLORS = {
 -- UnitDetailedThreatSituation scaledPercent: 100 = you pull aggro.
 Logic.PULL_WARNING_PERCENT = 80
 
+-- Threat queries may return secret values (the game hides them in some
+-- places, e.g. dungeons). Addon code may not compare them, and there is no
+-- secret-safe way to test a number against a threshold (ColorCurve:Evaluate
+-- refuses secret input from addon code), so a hidden value counts as unknown:
+-- it is never passed on, only flagged. isSecret is issecretvalue in the game.
+function Logic.VisibleThreat(status, percent, isSecret)
+    local statusHidden = isSecret(status)
+    local percentHidden = isSecret(percent)
+    return {
+        threatStatus = not statusHidden and status or nil,
+        threatPercent = not percentHidden and percent or nil,
+        threatStatusHidden = statusHidden,
+        threatPercentHidden = percentHidden,
+    }
+end
+
 -- Returns {r, g, b} to paint, or nil to keep BetterNamePlates' own color.
 -- unit fields: canAttack, isPlayer, classColor, isTapDenied, isTank,
--- threatStatus (UnitThreatSituation), threatPercent (scaledPercent).
+-- threatStatus (UnitThreatSituation), threatPercent (scaledPercent),
+-- threatStatusHidden (see VisibleThreat; a hidden percent is just nil).
 function Logic.DecideColor(unit)
     if not unit.canAttack then
         return nil
@@ -30,6 +47,11 @@ function Logic.DecideColor(unit)
 
     -- Tapped mobs keep the gray, a group tank keeps BetterNamePlates' tank colors.
     if unit.isTapDenied or unit.isTank then
+        return nil
+    end
+
+    -- Threat state unknown here: no threat colors.
+    if unit.threatStatusHidden then
         return nil
     end
 

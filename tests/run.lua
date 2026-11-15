@@ -26,6 +26,34 @@ check("status 3 -> aggro", Logic.DecideColor({canAttack = true, threatStatus = 3
 check("tapped -> keep gray", Logic.DecideColor({canAttack = true, isTapDenied = true, threatStatus = 3}), nil)
 check("group tank -> keep", Logic.DecideColor({canAttack = true, isTank = true, threatStatus = 3}), nil)
 
+-- Secret threat values (dungeons): a fake secret that errors on any comparison,
+-- like the game does for addon code.
+local SECRET = setmetatable({}, {
+    __lt = function() error("compared a secret") end,
+    __le = function() error("compared a secret") end,
+})
+local function isSecret(v) return v == SECRET end
+local function decide(status, percent)
+    local t = Logic.VisibleThreat(status, percent, isSecret)
+    return Logic.DecideColor({canAttack = true, threatStatus = t.threatStatus,
+        threatPercent = t.threatPercent, threatStatusHidden = t.threatStatusHidden})
+end
+local t = Logic.VisibleThreat(0, SECRET, isSecret)
+check("hidden percent not passed on", t.threatPercent, nil)
+check("hidden percent flagged", t.threatPercentHidden, true)
+check("visible status kept", t.threatStatus, 0)
+check("hidden percent, status 0 -> keep", decide(0, SECRET), nil)
+check("hidden percent, status 1 -> pull warning", decide(1, SECRET), C.pullWarning)
+check("hidden percent, status 3 -> aggro", decide(3, SECRET), C.playerAggro)
+t = Logic.VisibleThreat(SECRET, SECRET, isSecret)
+check("hidden status not passed on", t.threatStatus, nil)
+check("hidden status flagged", t.threatStatusHidden, true)
+check("hidden status -> keep", decide(SECRET, SECRET), nil)
+check("hidden status, visible 90% -> keep", decide(SECRET, 90), nil)
+t = Logic.VisibleThreat(nil, nil, isSecret)
+check("not on threat list: nothing hidden", t.threatStatusHidden or t.threatPercentHidden, false)
+check("visible 80% still warns", decide(0, 80), C.pullWarning)
+
 check("lvl name", Logic.FormatName("Старый кабан", 8), "8 Старый кабан")
 check("elite has no suffix", Logic.FormatName("Огр", 30), "30 Огр")
 check("skull level", Logic.FormatName("Босс", -1), "?? Босс")
