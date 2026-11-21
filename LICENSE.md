@@ -1,6 +1,6 @@
 Required Notice: Copyright (c) 2026 Vasyl Rudenko
 
-Any commercial use of this addon (including selling it, bundling it into paid products, paywalled distribution or paid services built on it) requires the author's prior written permission. To request a commercial license, contact the author.
+Any commercial use of this addon (including selling it, bundling it into paid products, paywalled distribution or paid services built on it) requires the author's prior written permission. To request a commercial license, contact the author on Telegram: @Zaazik
 
 All other use is governed by the PolyForm Noncommercial License 1.0.0, reproduced verbatim below.
 
