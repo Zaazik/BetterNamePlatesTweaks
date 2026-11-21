@@ -2,6 +2,7 @@
 ## Title: BetterNamePlates Tweaks
 ## Notes: Click-to-target box, stacking, enemy class colors and solo threat colors on top of BetterNamePlates.
 ## Version: 0.1.0
+## X-License: PolyForm-Noncommercial-1.0.0
 ## Dependencies: BetterNamePlates
 
 Logic.lua
